@@ -1,3 +1,5 @@
+use crate::*;
+
 /// Canvas of RGB888 pixels.
 pub struct Canvas {
     pub pixels: Vec<u8>,
@@ -27,8 +29,7 @@ impl Canvas {
 
     /// Put color from a GBC palette at (X,Y).
     pub fn put_color(&mut self, color_num: u8, palette: &[u8], x: u32, y: u32) {
-        let index = (2 * color_num) as usize;
-        let bgr = palette[index] as u32 | ((palette[index + 1] as u32) << 8);
+        let bgr = read_u16(palette, 2 * color_num as usize);
 
         let r = (bgr >> 0) & 0x1F;
         let g = (bgr >> 5) & 0x1F;

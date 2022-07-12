@@ -9,6 +9,8 @@
 /// Tilesets are located in banks $40-$53, five per bank. There are 98
 /// tilesets total. Tilesets 98 and 99 are zero filled.
 
+use crate::*;
+
 pub const NUM_TILESETS: u8 = 98;
 
 /// Get the ROM offset to a tileset.
@@ -17,11 +19,10 @@ pub fn tileset_offset(tileset_id: u8) -> usize {
     // Input: a = tileset_id
     // Output: a = bank number
     //         hl = address of tileset
+    let bank = 0x40 + tileset_id / 5;
+    let addr = 0x4001 + (tileset_id % 5) as u16 * 0x0C40;
 
-    let bank = 0x40 + tileset_id as usize / 5;
-    let addr = 0x4001 + (tileset_id as usize % 5) * 0x0C40;
-
-    0x4000 * bank + (addr - 0x4000)
+    rom1_offset(bank, addr)
 }
 
 /// Get the tiles and palettes of a tileset from the ROM.

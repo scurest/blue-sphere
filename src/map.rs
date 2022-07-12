@@ -6,14 +6,13 @@
 /// Map data is stored in structs (0x14 bytes each) in banks 0x54/0x55.
 /// The first byte is the tileset ID for that map. The next 2*4 bytes
 /// are the IDs of its neightboring maps in the up/right/down/left
-/// directions. Rest are unknown.
+/// directions. Rest of the struct is unknown.
 ///
 /// The location of the BG data (tiles & attributes) for a map is stored
 /// in a separate array in bank 0x5A. Tile & attribute data is
 /// compressed with a simple RLE method
 
-use crate::tileset::*;
-use crate::canvas::*;
+use crate::*;
 
 pub const NUM_MAPS: u16 = 1545;
 
@@ -25,10 +24,6 @@ pub struct Map {
 impl Map {
     pub fn with_id(map_id: u16) -> Map {
         Map { map_id }
-    }
-
-    pub fn is_ok(self) -> bool {
-        self.map_id < NUM_MAPS
     }
 
     /// Gets the map struct located in banks 0x54/0x55.
@@ -44,7 +39,7 @@ impl Map {
             addr = 0x4001 + 0x14 * (self.map_id - 800);
         }
 
-        let offset = 0x4000 * bank as usize + (addr as usize - 0x4000);
+        let offset = rom1_offset(bank, addr);
         &rom[offset..offset + 0x14]
 
     }
@@ -62,14 +57,11 @@ impl Map {
         let mut neighbors = [None; 4];
 
         for i in 0..4 {
-            let offset = 1 + 2 * i;
-            let n = map_struct[offset] as u16 | ((map_struct[offset + 1] as u16) << 8);
-
+            let n = read_u16(map_struct, 1 + 2*i);
             let n = n & 0x7FFF;  // not sure what the high bit means...
 
-            let neighbor = Map::with_id(n);
-            if neighbor.is_ok() {
-                neighbors[i] = Some(neighbor);
+            if n < NUM_MAPS {
+                neighbors[i] = Some(Map::with_id(n));
             }
         }
 
@@ -80,8 +72,8 @@ impl Map {
     pub fn decode_bg(self, rom: &[u8], tiles: &mut [u8], attribs: &mut [u8]) {
         // Location of the compressed tile/attribute data is stored in
         // an array at $5A:4001. Three bytes per map (address + bank).
-        let offset = 0x4000 * 0x5A + (3 * self.map_id as usize + 1);
-        let addr = rom[offset] as u16 | ((rom[offset+1] as u16) << 8);
+        let offset = rom1_offset(0x5A, 0x4001 + 3 * self.map_id);
+        let addr = read_u16(rom, offset);
         let bank = rom[offset + 2];
 
         let mut decoder = BGDecoder { bank, addr };
@@ -138,7 +130,7 @@ impl BGDecoder {
 
         assert!((0x4000..0x8000).contains(&self.addr), "address not in ROM1");
 
-        let offset = 0x4000 * self.bank as usize + (self.addr as usize - 0x4000);
+        let offset = rom1_offset(self.bank, self.addr);
         let input = &rom[offset..];
 
         let mut i = 0;
@@ -186,7 +178,7 @@ impl BGDecoder {
         // Coresponding subroutine: $0BAD
         // Decodes map attribute data at de into the region $D9C5..$DB2D.
 
-        let offset = 0x4000 * self.bank as usize + (self.addr as usize - 0x4000);
+        let offset = rom1_offset(self.bank, self.addr);
         let mut input = &rom[offset..];
 
         // If the first byte is 7, the attributes don't fit in the
@@ -194,7 +186,7 @@ impl BGDecoder {
         if input[0] == 7 {
             self.bank += 1;
             self.addr = 0x4001;
-            let offset = 0x4000 * self.bank as usize + (self.addr as usize - 0x4000);
+            let offset = rom1_offset(self.bank, self.addr);
             input = &rom[offset..];
         }
 
